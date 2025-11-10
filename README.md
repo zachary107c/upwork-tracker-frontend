@@ -36,7 +36,7 @@ A modern Next.js 14 frontend application for the TokByte authentication system w
    npm run dev
    ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://174.138.178.2453000`
 
 ## 🏗️ Project Structure
 
@@ -81,7 +81,7 @@ Frontend/
 Create a `.env.local` file in the Frontend directory:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://174.138.178.245:8000
 ```
 
 ### Tailwind CSS
@@ -138,7 +138,7 @@ The application uses Tailwind CSS with a modern design system:
 
 The frontend communicates with the FastAPI backend:
 
-- **Base URL**: `http://localhost:8000`
+- **Base URL**: `http://174.138.178.245:8000`
 - **Authentication**: JWT-based authentication
 - **Endpoints**: 
   - `/signin` - User authentication

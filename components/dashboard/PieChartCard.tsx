@@ -73,7 +73,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({ title, data, dataKey, color
                       );
                     });
                   })()}
-                </svg>
+</svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-2xl font-bold text-gray-800">{total}</span>
                 </div>

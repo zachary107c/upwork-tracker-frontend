@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Alert from '@/components/Alert';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://174.138.178.245:8000';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setAlert(null); // Clear any previous alerts
 
     try {
       const response = await fetch(`${API_URL}/signin`, {
@@ -39,6 +40,7 @@ export default function LoginPage() {
         sessionStorage.setItem('username', username);
         sessionStorage.setItem('isAdmin', data.role === 'admin' ? 'true' : 'false');
         
+        // Keep loading state until navigation completes
         if (data.role === 'admin') {
           console.log('Redirecting to admin dashboard');
           router.push('/dashboard');
@@ -46,13 +48,14 @@ export default function LoginPage() {
           console.log('Redirecting to user dashboard');
           router.push('/user-dashboard');
         }
+        // Don't set loading to false here - let it stay until page navigation
       } else {
+        setLoading(false);
         setAlert({ message: data.detail || 'Login failed', type: 'error' });
       }
     } catch (error) {
-      setAlert({ message: 'Connection error. Please check if backend is running.', type: 'error' });
-    } finally {
       setLoading(false);
+      setAlert({ message: 'Connection error. Please check if backend is running.', type: 'error' });
     }
   };
 
@@ -98,8 +101,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center"
           >
+            {loading && (
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>

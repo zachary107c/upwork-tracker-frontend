@@ -5,6 +5,9 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 export const metadata: Metadata = {
   title: 'Upwork Tracker',
   description: 'Upwork job tracking and management system',
+  icons: {
+    icon: '/tok.png',
+  },
 }
 
 export default function RootLayout({
