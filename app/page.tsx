@@ -34,10 +34,19 @@ export default function LoginPage() {
         console.log('Login response data:', data);
         console.log('User role:', data.role);
         console.log('Is admin?', data.role === 'admin');
+        const displayName = data.display_name || username;
+        const isWorking = data.is_working ?? true;
         
         // Store user credentials in sessionStorage
-        sessionStorage.setItem('user', JSON.stringify(data));
+        sessionStorage.setItem('user', JSON.stringify({
+          ...data,
+          username,
+          display_name: displayName,
+          is_working: isWorking,
+        }));
         sessionStorage.setItem('username', username);
+        sessionStorage.setItem('displayName', displayName);
+        sessionStorage.setItem('isWorking', isWorking ? 'true' : 'false');
         sessionStorage.setItem('isAdmin', data.role === 'admin' ? 'true' : 'false');
         
         // Keep loading state until navigation completes

@@ -10,6 +10,7 @@ const API_URL = 'http://174.138.178.245:8000';
 
 interface UserStats {
   username: string;
+  displayName?: string;
   proposals: number;
   interviews: number;
   hire: number;
@@ -54,6 +55,7 @@ interface Source {
 
 export default function UserDashboardPage() {
   const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [activeTab, setActiveTab] = useState<'bid-insight' | 'jobs' | 'sources' | 'user-management'>('bid-insight');
@@ -107,6 +109,7 @@ export default function UserDashboardPage() {
 
     const userData = JSON.parse(user);
     setUsername(userData.username);
+    setDisplayName(userData.display_name || userData.username);
     
     // Set default custom date to day before yesterday
     const dayBeforeYesterday = new Date();
@@ -210,6 +213,7 @@ export default function UserDashboardPage() {
         // Set my stats
         setMyStats({ 
           username, 
+          displayName: data.myStats.display_name || data.myStats.displayName || username,
           proposals: data.myStats.proposals || 0, 
           interviews: data.myStats.interviews || 0, 
           hire: data.myStats.hire || 0,
@@ -219,7 +223,11 @@ export default function UserDashboardPage() {
         });
         
         // Set all stats with ranks
-        const statsWithRank = calculateRanks(data.allStats || []);
+        const normalizedStats = (data.allStats || []).map((user: any) => ({
+          ...user,
+          displayName: user.display_name || user.displayName || user.username,
+        }));
+        const statsWithRank = calculateRanks(normalizedStats);
         setAllStats(statsWithRank);
       } else {
         const errorText = await response.text();
@@ -304,7 +312,11 @@ export default function UserDashboardPage() {
     
     return job.users
       .filter(user => user[type] && user[type].count > 0)
-      .map(user => `${user.userId}: ${user[type].count}`)
+      .map(user => {
+        const match = allStats.find(u => u.username === user.userId);
+        const name = match?.displayName || user.userId;
+        return `${name}: ${user[type].count}`;
+      })
       .join(', ');
   };
 
@@ -499,9 +511,9 @@ export default function UserDashboardPage() {
       
       rankedData.push({
         rank,
-        proposals: proposalsUsers.map(u => ({ username: u.username, count: u.proposals })),
-        interviews: interviewsUsers.map(u => ({ username: u.username, count: u.interviews })),
-        hire: hireUsers.map(u => ({ username: u.username, count: u.hire }))
+        proposals: proposalsUsers.map(u => ({ username: u.username, displayName: u.displayName || u.username, count: u.proposals })),
+        interviews: interviewsUsers.map(u => ({ username: u.username, displayName: u.displayName || u.username, count: u.interviews })),
+        hire: hireUsers.map(u => ({ username: u.username, displayName: u.displayName || u.username, count: u.hire }))
       });
     }
     
@@ -700,7 +712,7 @@ export default function UserDashboardPage() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
-                Welcome, <span className="font-bold text-blue-600 dark:text-blue-400 text-base sm:text-lg">{username}</span>
+                Welcome, <span className="font-bold text-blue-600 dark:text-blue-400 text-base sm:text-lg">{displayName || username}</span>
               </span>
               <ThemeToggle />
             </div>
@@ -959,7 +971,8 @@ export default function UserDashboardPage() {
                                 <div className="space-y-1">
                                   {rankData.proposals.map((user, index) => (
                                     <div key={index} className={`text-sm ${user.username === username ? 'font-bold' : ''}`} style={{ color: user.username === username ? '#10b981' : '#3b82f6' }}>
-                                      {user.username}: {user.count}
+                                      <span>{user.displayName}</span>: {user.count}
+                                      {user.username === username && <span className="ml-1 text-xs text-emerald-500">you</span>}
                                     </div>
                                   ))}
                                   {rankData.proposals.length === 0 && (
@@ -971,7 +984,8 @@ export default function UserDashboardPage() {
                                 <div className="space-y-1">
                                   {rankData.interviews.map((user, index) => (
                                     <div key={index} className={`text-sm ${user.username === username ? 'font-bold' : ''}`} style={{ color: user.username === username ? '#10b981' : '#3b82f6' }}>
-                                      {user.username}: {user.count}
+                                      <span>{user.displayName}</span>: {user.count}
+                                      {user.username === username && <span className="ml-1 text-xs text-emerald-500">you</span>}
                                     </div>
                                   ))}
                                   {rankData.interviews.length === 0 && (
@@ -983,7 +997,8 @@ export default function UserDashboardPage() {
                                 <div className="space-y-1">
                                   {rankData.hire.map((user, index) => (
                                     <div key={index} className={`text-sm ${user.username === username ? 'font-bold' : ''}`} style={{ color: user.username === username ? '#10b981' : '#3b82f6' }}>
-                                      {user.username}: {user.count}
+                                      <span>{user.displayName}</span>: {user.count}
+                                      {user.username === username && <span className="ml-1 text-xs text-emerald-500">you</span>}
                                     </div>
                                   ))}
                                   {rankData.hire.length === 0 && (

@@ -2,6 +2,7 @@
 
 interface UserStats {
   username: string;
+  displayName?: string;
   proposals: number;
   interviews: number;
   hire: number;
@@ -33,7 +34,10 @@ const ProgressBarCard: React.FC<ProgressBarCardProps> = ({ title, data, dataKey,
           
           return (
             <div key={user.username} className="flex items-center space-x-3">
-              <div className="w-20 text-sm text-gray-600 truncate">{user.username}</div>
+              <div className="w-32 text-sm text-gray-600 truncate">
+                <span className="block">{user.displayName || user.username}</span>
+                <span className="text-xs text-gray-400">@{user.username}</span>
+              </div>
               <div className="flex-1 bg-gray-200 rounded-full h-4">
                 <div 
                   className="h-4 rounded-full transition-all duration-300" 

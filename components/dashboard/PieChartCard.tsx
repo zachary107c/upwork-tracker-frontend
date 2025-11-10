@@ -2,6 +2,7 @@
 
 interface UserStats {
   username: string;
+  displayName?: string;
   proposals: number;
   interviews: number;
   hire: number;
@@ -26,6 +27,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({ title, data, dataKey, color
 
   const chartData = filteredData.map(user => ({
     username: user.username,
+    displayName: user.displayName || user.username,
     value: user[dataKey] as number,
     color: getUserColor(user.username)
   }));
@@ -99,7 +101,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({ title, data, dataKey, color
                     style={{ backgroundColor: getUserColor(user.username) }}
                   ></div>
                   <span className="text-xs text-gray-600 truncate">
-                    {user.username}: {user[dataKey] as number}
+                    {(user.displayName || user.username)}: {user[dataKey] as number}
                   </span>
                 </div>
               ))}

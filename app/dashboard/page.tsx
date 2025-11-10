@@ -14,12 +14,21 @@ const API_URL = 'http://174.138.178.245:8000';
 
 interface User {
   username: string;
+  displayName: string;
   role: string;
   is_admin?: boolean;
+  isWorking: boolean;
+}
+
+interface DialogSubmitPayload {
+  username?: string;
+  password?: string;
+  displayName?: string;
 }
 
 interface UserStats {
   username: string;
+  displayName?: string;
   proposals: number;
   interviews: number;
   hire: number;
@@ -63,15 +72,20 @@ export default function DashboardPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'bidInsight' | 'jobs' | 'sources' | 'users'>('bidInsight');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
   
-  // Get username from session storage
-  const username = JSON.parse(sessionStorage.getItem('user') || '{}').username || 'Admin';
+  // Get user info from session storage
+  const storedUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+  const username = storedUser.username || 'Admin';
+  const displayName = storedUser.display_name || username;
+  const isWorkingSelf = storedUser.is_working ?? true;
   const [period, setPeriod] = useState<'today' | 'yesterday' | 'week' | 'month' | 'lastWeek' | 'lastMonth' | 'custom'>('today');
   const [customDate, setCustomDate] = useState('');
   const [allStats, setAllStats] = useState<UserStats[]>([]);
@@ -128,10 +142,12 @@ export default function DashboardPage() {
       const data = await response.json();
       console.log('Raw data from API:', data);
       
-      const mappedUsers = data.map((user: { username: string; role: string; is_admin?: boolean }) => ({
+      const mappedUsers = data.map((user: { username: string; display_name?: string; role: string; is_admin?: boolean; is_working?: boolean }) => ({
         username: user.username,
+        displayName: user.display_name || user.username,
         role: user.role || 'user',
-        is_admin: user.is_admin || false
+        is_admin: user.is_admin || false,
+        isWorking: user.is_working ?? true
       }));
       
       console.log('Mapped users:', mappedUsers);
@@ -144,12 +160,49 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateUser = async (username: string, password: string) => {
+  const handleUpdateDisplayName = async (payload?: DialogSubmitPayload) => {
+    if (!userToEdit || !payload?.displayName) return;
+
+    try {
+      const response = await fetch(`${API_URL}/update-display-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userToEdit.username, display_name: payload.displayName }),
+      });
+
+      if (response.ok) {
+        setAlert({ message: 'Display name updated successfully!', type: 'success' });
+        if (userToEdit.username === username) {
+          const updatedUser = {
+            ...storedUser,
+            display_name: payload.displayName,
+          };
+          sessionStorage.setItem('user', JSON.stringify(updatedUser));
+          sessionStorage.setItem('displayName', payload.displayName);
+        }
+        setShowEditDialog(false);
+        setUserToEdit(null);
+        fetchUsers();
+      } else {
+        const data = await response.json();
+        setAlert({ message: data.detail || 'Failed to update display name', type: 'error' });
+      }
+    } catch (error) {
+      setAlert({ message: 'Connection error', type: 'error' });
+    }
+  };
+
+  const handleCreateUser = async (payload?: DialogSubmitPayload) => {
+    if (!payload?.username || !payload?.password || !payload?.displayName) return;
     try {
       const response = await fetch(`${API_URL}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ 
+          username: payload.username, 
+          password: payload.password,
+          display_name: payload.displayName 
+        }),
       });
 
       if (response.ok) {
@@ -165,14 +218,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleResetPassword = async (newPassword: string) => {
-    if (!selectedUser) return;
+  const handleResetPassword = async (payload?: DialogSubmitPayload) => {
+    if (!selectedUser || !payload?.password) return;
 
     try {
       const response = await fetch(`${API_URL}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: selectedUser, new_password: newPassword }),
+        body: JSON.stringify({ username: selectedUser, new_password: payload.password }),
       });
 
       if (response.ok) {
@@ -181,6 +234,35 @@ export default function DashboardPage() {
         setSelectedUser(null);
       } else {
         setAlert({ message: 'Failed to reset password', type: 'error' });
+      }
+    } catch (error) {
+      setAlert({ message: 'Connection error', type: 'error' });
+    }
+  };
+
+  const handleToggleWorkingStatus = async (user: User) => {
+    const newStatus = !user.isWorking;
+    try {
+      const response = await fetch(`${API_URL}/update-working-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username, is_working: newStatus }),
+      });
+
+      if (response.ok) {
+        setAlert({ message: `Marked ${user.displayName} as ${newStatus ? 'Active' : 'Inactive'}!`, type: 'success' });
+        if (user.username === username) {
+          const updatedUser = {
+            ...storedUser,
+            is_working: newStatus,
+          };
+          sessionStorage.setItem('user', JSON.stringify(updatedUser));
+          sessionStorage.setItem('isWorking', newStatus ? 'true' : 'false');
+        }
+        fetchUsers();
+      } else {
+        const data = await response.json();
+        setAlert({ message: data.detail || 'Failed to update working status', type: 'error' });
       }
     } catch (error) {
       setAlert({ message: 'Connection error', type: 'error' });
@@ -211,6 +293,8 @@ export default function DashboardPage() {
 
   const handleRemoveUser = (username: string) => {
     setSelectedUser(username);
+    setShowEditDialog(false);
+    setUserToEdit(null);
     setShowDeleteDialog(true);
   };
 
@@ -220,7 +304,11 @@ export default function DashboardPage() {
     
     return job.users
       .filter(user => user[type] && user[type].count > 0)
-      .map(user => `${user.userId}: ${user[type].count}`)
+      .map(user => {
+        const match = users.find(u => u.username === user.userId);
+        const name = match?.displayName || user.userId;
+        return `${name}: ${user[type].count}`;
+      })
       .join(', ');
   };
 
@@ -274,7 +362,11 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json();
         console.log('Admin dashboard - loaded stats:', data);
-        setAllStats(data);
+        const normalizedStats = (data || []).map((user: any) => ({
+          ...user,
+          displayName: user.display_name || user.displayName || user.username,
+        }));
+        setAllStats(normalizedStats);
       } else {
         console.error('Failed to load stats:', response.status, response.statusText);
       }
@@ -351,7 +443,7 @@ export default function DashboardPage() {
     formData.append('title', uploadTitle);
     formData.append('description', uploadDescription);
     formData.append('file', uploadFile);
-    formData.append('uploadedBy', username);
+    formData.append('uploadedBy', displayName);
 
     setUploading(true);
     setUploadProgress(0);
@@ -606,6 +698,11 @@ export default function DashboardPage() {
   const toggleUserDropdown = () => {
     setIsUserDropdownOpen(!isUserDropdownOpen);
   };
+  const selectedDisplayNames = selectedUsers.map(selectedUsername => {
+    const match = users.find(u => u.username === selectedUsername);
+    return match ? match.displayName : selectedUsername;
+  });
+
 
   const handleUserCheckboxChange = (username: string, checked: boolean) => {
     if (checked) {
@@ -861,7 +958,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
-                Welcome, <span className="font-bold text-green-600 dark:text-green-400 text-base sm:text-lg">{username}</span>
+                Welcome, <span className="font-bold text-green-600 dark:text-green-400 text-base sm:text-lg">{displayName}</span>
               </span>
               <ThemeToggle />
             </div>
@@ -902,9 +999,33 @@ export default function DashboardPage() {
                   {users.map((user, index) => (
                         <tr key={index} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                           <td className="py-4 px-6">
-                            <div className="flex items-center space-x-3">
-                              <span className="font-medium text-gray-800 dark:text-white">{user.username}</span>
-                        </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <span className="font-medium text-gray-800 dark:text-white block">{user.displayName}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</span>
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                                    user.isWorking
+                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                      : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                                  }`}
+                                >
+                                  {user.isWorking ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setUserToEdit(user);
+                                  setShowEditDialog(true);
+                                }}
+                                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                title="Edit Display Name"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.25 2.25 0 013.182 3.182L9.75 18l-4.5 1.5 1.5-4.5 11.112-10.513z" />
+                                </svg>
+                              </button>
+                            </div>
                           </td>
                           <td className="py-4 px-6">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -928,6 +1049,23 @@ export default function DashboardPage() {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
+                        </button>
+                        <button
+                          onClick={() => handleToggleWorkingStatus(user)}
+                          className={`p-2 ${
+                            user.isWorking
+                              ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                              : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30'
+                          } rounded-lg transition-colors`}
+                          title={user.isWorking ? 'Mark as Inactive' : 'Mark as Active'}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {user.isWorking ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            )}
+                          </svg>
                         </button>
                         <button
                           onClick={() => handleRemoveUser(user.username)}
@@ -1140,7 +1278,7 @@ export default function DashboardPage() {
                                         onClick={() => handleUserClick(user.username)}
                                         className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline font-medium"
                                       >
-                                      {user.username}
+                                      {user.displayName || user.username}
                                       </button>
                                     </td>
                                     <td className="py-4 px-6">
@@ -1226,7 +1364,7 @@ export default function DashboardPage() {
                                             onClick={() => handleUserClick(proposalsUser.username)}
                                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                                           >
-                                            {proposalsUser.username}
+                                            {proposalsUser.displayName || proposalsUser.username}
                                           </button>: {proposalsUser.proposals}
                                         </span>
                                       </div>
@@ -1238,7 +1376,7 @@ export default function DashboardPage() {
                                             onClick={() => handleUserClick(interviewsUser.username)}
                                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                                           >
-                                            {interviewsUser.username}
+                                            {interviewsUser.displayName || interviewsUser.username}
                                           </button>: {interviewsUser.interviews}
                                         </span>
                                       </div>
@@ -1250,7 +1388,7 @@ export default function DashboardPage() {
                                             onClick={() => handleUserClick(hireUser.username)}
                                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                                           >
-                                            {hireUser.username}
+                                            {hireUser.displayName || hireUser.username}
                                           </button>: {hireUser.hire}
                                         </span>
                                       </div>
@@ -1361,7 +1499,7 @@ export default function DashboardPage() {
                             {selectedUsers.length === 0 
                               ? 'Select users...' 
                               : selectedUsers.length === 1 
-                                ? selectedUsers[0]
+                                ? selectedDisplayNames[0]
                                 : `${selectedUsers.length} users selected`
                             }
                           </span>
@@ -1386,7 +1524,10 @@ export default function DashboardPage() {
                                     onChange={(e) => handleUserCheckboxChange(user.username, e.target.checked)}
                                     className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
                                   />
-                                  <span className="text-sm text-gray-900 dark:text-white">{user.username}</span>
+                                  <span className="flex flex-col text-sm text-gray-900 dark:text-white">
+                                    <span>{user.displayName}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">@{user.username}</span>
+                                  </span>
                                 </label>
                               ))}
                             </div>
@@ -1491,7 +1632,7 @@ export default function DashboardPage() {
                 {selectedUsers.length > 0 && (
                   <div className="mb-4 flex items-center gap-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      Filtered by: <span className="font-medium text-blue-600 dark:text-blue-400">{selectedUsers.join(', ')}</span>
+                      Filtered by: <span className="font-medium text-blue-600 dark:text-blue-400">{selectedDisplayNames.join(', ')}</span>
                     </span>
                     <button
                       onClick={clearSelectedUsers}
@@ -1757,7 +1898,7 @@ export default function DashboardPage() {
         <Dialog
           title="Create New User"
           onClose={() => setShowCreateDialog(false)}
-          onSubmit={(username, password) => handleCreateUser(username!, password!)}
+          onSubmit={handleCreateUser}
           type="create"
         />
       )}
@@ -1769,9 +1910,23 @@ export default function DashboardPage() {
             setShowResetDialog(false);
             setSelectedUser(null);
           }}
-          onSubmit={(_, password) => handleResetPassword(password!)}
+          onSubmit={handleResetPassword}
           type="reset"
           username={selectedUser || ''}
+        />
+      )}
+
+      {showEditDialog && userToEdit && (
+        <Dialog
+          title="Edit Display Name"
+          onClose={() => {
+            setShowEditDialog(false);
+            setUserToEdit(null);
+          }}
+          onSubmit={handleUpdateDisplayName}
+          type="edit"
+          username={userToEdit.username}
+          displayName={userToEdit.displayName}
         />
       )}
 
